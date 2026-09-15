@@ -1,0 +1,80 @@
+name: Pipeline CI/CD Desorganizado - ACME
+
+on:
+  push:
+    branches:
+      - develop
+      - release
+      - main
+
+  pull_request:
+    branches:
+      - develop
+      - release
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: theguissan/postgrad/2-cicd/module-3/challenge/solution/.github/workflow-templates/build.yml@main
+
+      - name: Executar Testes Unitários
+        run: npm run test:unit
+
+      - name: Executar Testes de Integração
+        run: npm run test:integration
+
+      - name: Executar Testes de Performance
+        run: ab -n 1000 -c 10 http://localhost:3000/
+
+      - name: Verificação de Código com SonarQube
+        run: |
+          sonar-scanner \
+          -Dsonar.projectKey=acme_project \
+          -Dsonar.sources=. \
+          -Dsonar.host.url=http://localhost:9000 \
+          -Dsonar.login=your_sonarqube_token
+
+      - name: Construir Docker Image Microserviço 1
+        run: docker build -t microservice1:latest ./microservice1
+
+      - name: Construir Docker Image Microserviço 2
+        run: docker build -t microservice2:latest ./microservice2
+
+      - name: Testes de Segurança com Trivy no Microserviço 1
+        run: trivy image --severity HIGH,CRITICAL microservice1:latest
+
+      - name: Testes de Segurança com Trivy no Microserviço 2
+        run: trivy image --severity HIGH,CRITICAL microservice2:latest
+
+      - name: Provisionar Infraestrutura Staging
+        run: |
+          cd terraform/staging
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Publicar Docker Image para ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com
+          docker tag microservice1:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/microservice1:latest
+          docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/microservice1:latest
+          docker tag microservice2:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/microservice2:latest
+          docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/microservice2:latest
+
+      - name: Deploy para Produção
+        run: |
+          cd terraform/production
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Enviar Notificação
+        run: echo "Deploy realizado com sucesso!" | mail -s "Deploy Completo" team@acme.com
+
+      - name: Limpeza
+        run: |
+          docker rmi $(docker images -q)
+          cd terraform/staging
+          terraform destroy -auto-approve
