@@ -1,14 +1,8 @@
 name: Build
 
 on:
-  workflow_call:
-    inputs:
-      node_version:
-        description: Insert a node version pls
-        required: true
-        type: string
-        default: '14'
-        
+  workflow_call
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,9 +11,11 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Setup Node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{inputs.node_version}}
+          #tries to use node version from .nvmrc or .node-version file from root. use 14.x if neither exists.
+          node-version-file: '.nvmrc'
+          node-version: '14.x'
 
       - name: Install Dependencies
         run: npm install
