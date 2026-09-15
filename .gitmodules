@@ -1,0 +1,3 @@
+[submodule "2-cicd/module-3/challenge/solution"]
+	path = 2-cicd/module-3/challenge/solution
+	url = https://github.com/theguissan/acme-pipeline-challenge
